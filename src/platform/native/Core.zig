@@ -90,6 +90,8 @@ current_border: bool,
 last_border: bool,
 current_headless: bool,
 last_headless: bool,
+current_resizeable: bool,
+last_resizeable: bool,
 current_size: Size,
 last_size: Size,
 current_size_limit: SizeLimit = .{
@@ -297,6 +299,8 @@ pub fn init(
         .current_title = undefined,
         .current_border = undefined,
         .last_border = undefined,
+        .current_resizeable = undefined,
+        .last_resizeable = undefined,
         .current_headless = undefined,
         .last_headless = undefined,
         .current_size = undefined,
@@ -315,6 +319,9 @@ pub fn init(
 
     core.current_border = options.border;
     core.last_border = true;
+
+    core.current_resizeable = options.resizeable;
+    core.last_resizeable = options.resizeable;
 
     core.current_headless = options.headless;
     core.last_headless = core.current_headless;
@@ -618,9 +625,11 @@ pub fn update(self: *Core, app: anytype) !bool {
         if (self.current_display_mode != self.last_display_mode) {
             const monitor_index = self.current_monitor_index;
             const current_border = self.current_border;
+            const current_resizeable = self.current_resizeable;
             switch (self.current_display_mode) {
                 .windowed => {
                     self.window.setAttrib(.decorated, current_border);
+                    self.window.setAttrib(.resizeable, current_resizeable);
                     self.window.setAttrib(.floating, false);
                     self.window.setMonitor(
                         null,
@@ -651,6 +660,7 @@ pub fn update(self: *Core, app: anytype) !bool {
                     if (monitor) |m| {
                         const video_mode = m.getVideoMode();
                         if (video_mode) |v| {
+                            self.window.setAttrib(.resizeable, false);
                             self.window.setMonitor(m, 0, 0, v.getWidth(), v.getHeight(), null);
                         }
                     }
@@ -677,6 +687,7 @@ pub fn update(self: *Core, app: anytype) !bool {
                         if (video_mode) |v| {
                             self.window.setAttrib(.decorated, false);
                             self.window.setAttrib(.floating, true);
+                            self.window.setAttrib(.resizeable, false);
                             self.window.setMonitor(null, 0, 0, v.getWidth(), v.getHeight(), null);
                         }
                     }
@@ -689,6 +700,12 @@ pub fn update(self: *Core, app: anytype) !bool {
         if (self.current_border != self.last_border) {
             self.last_border = self.current_border;
             if (self.current_display_mode != .borderless) self.window.setAttrib(.decorated, self.current_border);
+        }
+
+        // Resizeable changes only affect windowed mode
+        if (self.current_resizeable != self.last_resizeable) {
+            self.last_resizeable = self.current_resizeable;
+            if (self.current_display_mode == .windowed) self.window.setAttrib(.resizeable, self.current_resizeable);
         }
 
         // Headless changes
@@ -831,6 +848,24 @@ pub fn border(self: *Core) bool {
     self.state_mu.lock();
     defer self.state_mu.unlock();
     return self.current_border;
+}
+
+// May be called from any thread.
+pub fn setResizeable(self: *Core, value: bool) void {
+    self.state_mu.lock();
+    defer self.state_mu.unlock();
+    self.current_resizeable = value;
+    if (self.current_resizeable != self.last_resizeable) {
+        self.state_update.set();
+        self.wakeMainThread();
+    }
+}
+
+// May be called from any thread.
+pub fn resizeable(self: *Core) bool {
+    self.state_mu.lock();
+    defer self.state_mu.unlock();
+    return self.resizeable;
 }
 
 // May be called from any thread.
