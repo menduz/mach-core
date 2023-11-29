@@ -142,7 +142,7 @@ pub fn init(
     options: Options,
 ) !void {
     if (!@import("builtin").is_test and mach_core.options.use_wgpu) _ = mach_core.wgpu.Export(@import("root").GPUInterface);
-    if (!@import("builtin").is_test and mach_core.options.use_dgpu) _ = mach_core.dgpu.Export(@import("root").DGPUInterface);
+    if (!@import("builtin").is_test and mach_core.options.use_sysgpu) _ = mach_core.sysgpu.sysgpu.Export(@import("root").SYSGPUInterface);
 
     const backend_type = try util.detectBackendType(allocator);
 
@@ -1102,6 +1102,18 @@ pub inline fn outOfMemory(self: *Core) bool {
 pub inline fn wakeMainThread(self: *Core) void {
     _ = self;
     glfw.postEmptyEvent();
+}
+
+// May be called from any thread.
+pub fn nativeWindowCocoa(self: *Core) *anyopaque {
+    const glfw_native = glfw.Native(comptime util.detectGLFWOptions());
+    return glfw_native.getCocoaWindow(self.window).?;
+}
+
+// May be called from any thread.
+pub fn nativeWindowWin32(self: *Core) std.os.windows.HWND {
+    const glfw_native = glfw.Native(comptime util.detectGLFWOptions());
+    return glfw_native.getWin32Window(self.window);
 }
 
 fn toMachButton(button: glfw.mouse_button.MouseButton) MouseButton {

@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub const dusk = @import("mach-dusk");
+pub const sysgpu = @import("mach-sysgpu");
 pub const sysjs = @import("mach-sysjs");
 pub const Timer = @import("Timer.zig");
 const platform_util = if (builtin.cpu.arch == .wasm32) {} else @import("platform/native/util.zig");
@@ -18,15 +18,15 @@ fn ErrorSet(comptime F: type) type {
 /// ```
 /// pub const mach_core_options = core.ComptimeOptions{
 ///     .use_wgpu = true,
-///     .use_dgpu = true,
+///     .use_sysgpu = true,
 /// };
 /// ```
 pub const ComptimeOptions = struct {
     /// Whether to use
     use_wgpu: bool = true,
 
-    /// Whether or not to use the experimental Dusk graphics API.
-    use_dgpu: bool = false,
+    /// Whether or not to use the experimental sysgpu graphics API.
+    use_sysgpu: bool = false,
 };
 
 pub const options = if (@hasDecl(@import("root"), "mach_core_options"))
@@ -35,9 +35,8 @@ else
     ComptimeOptions{};
 
 pub const wgpu = @import("mach-gpu");
-pub const dgpu = dusk.dgpu;
 
-pub const gpu = if (options.use_dgpu) dgpu else wgpu;
+pub const gpu = if (options.use_sysgpu) sysgpu.sysgpu else wgpu;
 
 pub fn AppInterface(comptime app_entry: anytype) void {
     if (!@hasDecl(app_entry, "App")) {
@@ -80,6 +79,7 @@ pub fn AppInterface(comptime app_entry: anytype) void {
     }
 }
 
+
 /// wasm32: custom std.log implementation which logs to the browser console.
 /// other: std.log.defaultLog
 pub const defaultLog = platform.Core.defaultLog;
@@ -116,8 +116,6 @@ pub var descriptor: gpu.SwapChain.Descriptor = undefined;
 /// second, no matter what frame rate the application is running at.
 pub var delta_time: f32 = 0;
 pub var delta_time_ns: u64 = 0;
-
-var core: platform.Core = undefined;
 
 var frame: Frequency = undefined;
 var input: Frequency = undefined;
@@ -461,6 +459,20 @@ pub inline fn frameRate() u32 {
 /// This is updated once per second.
 pub inline fn inputRate() u32 {
     return input.rate;
+}
+
+/// Returns the underlying native NSWindow pointer
+///
+/// May only be called on macOS.
+pub fn nativeWindowCocoa() *anyopaque {
+    return internal.nativeWindowCocoa();
+}
+
+/// Returns the underlying native Windows' HWND pointer
+///
+/// May only be called on Windows.
+pub fn nativeWindowWin32() std.os.windows.HWND {
+    return internal.nativeWindowWin32();
 }
 
 pub const Size = struct {
